@@ -51,9 +51,17 @@ extern "C" JNIEXPORT jint JNICALL Java_com_homesoft_photo_libraw_LibRaw_openFd(J
     auto libRaw = getLibRaw(env, jLibRaw);
     int result=libRaw->open_datastream(&stream);
     if(result==0){
-        //result=libRaw->unpack();
+        result=libRaw->unpack_thumb();
     }
     return result;
+}
+extern "C" JNIEXPORT jobject JNICALL Java_com_homesoft_photo_libraw_LibRaw_getThumbnail(JNIEnv* env, jobject jLibRaw){
+    auto libRaw = getLibRaw(env, jLibRaw);
+    int count = libRaw->imgdata.thumbs_list.thumbcount;
+    if (count > 0) {
+        return env->NewDirectByteBuffer(libRaw->imgdata.thumbnail.thumb, libRaw->imgdata.thumbnail.tlength);
+    }
+    return nullptr;
 }
 extern "C" JNIEXPORT void JNICALL Java_com_homesoft_photo_libraw_LibRaw_clearCancelFlag(JNIEnv* env, jobject jLibRaw){
     getLibRaw(env, jLibRaw)->clearCancelFlag();

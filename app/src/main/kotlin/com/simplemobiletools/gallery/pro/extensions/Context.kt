@@ -49,6 +49,7 @@ import java.nio.ByteBuffer
 import java.nio.channels.FileChannel
 import kotlin.collections.set
 import com.homesoft.photo.libraw.LibRaw
+import com.simplemobiletools.gallery.pro.raw.RawImage
 
 val Context.audioManager get() = getSystemService(Context.AUDIO_SERVICE) as AudioManager
 
@@ -442,6 +443,8 @@ fun Context.loadImage(
     if (type == TYPE_IMAGES || type == TYPE_VIDEOS || type == TYPE_RAWS || type == TYPE_PORTRAITS) {
         if (type == TYPE_IMAGES && path.isPng()) {
             loadPng(path, target, cropThumbnails, roundCorners, signature, skipMemoryCacheAtPaths)
+        } else if (type == TYPE_RAWS) {
+            loadRaw(path, target, cropThumbnails, roundCorners, signature, skipMemoryCacheAtPaths)
         } else {
             loadJpg(path, target, cropThumbnails, roundCorners, signature, skipMemoryCacheAtPaths)
         }
@@ -569,6 +572,48 @@ fun Context.loadJpg(
     builder = builder.transform(*transformations.toTypedArray())
 
     builder.into(target)
+}
+
+fun Context.loadRaw(
+    path: String,
+    target: MySquareImageView,
+    cropThumbnails: Boolean,
+    roundCorners: Int,
+    signature: ObjectKey,
+    skipMemoryCacheAtPaths: ArrayList<String>? = null
+) {
+    val rawImage = RawImage()
+    rawImage.open(this, path)
+    val orientation = rawImage.orientationInDegrees
+    var options = RequestOptions()
+        .signature(signature)
+//        .skipMemoryCache(skipMemoryCacheAtPaths?.contains(path) == true)
+        .diskCacheStrategy(DiskCacheStrategy.RESOURCE)
+        .priority(Priority.LOW)
+        .diskCacheStrategy(DiskCacheStrategy.RESOURCE)
+
+    if (cropThumbnails) options = options.centerCrop() else options = options.fitCenter()
+
+    rawImage.data?.let {
+        var builder = Glide.with(applicationContext)
+            .load(it)
+            .apply(options)
+            .transition(DrawableTransitionOptions.withCrossFade())
+
+        val transformations = mutableListOf<Transformation<Bitmap>>(Rotate(orientation))
+        if (cropThumbnails) {
+            transformations.add(CenterCrop())
+        }
+        if (roundCorners != ROUNDED_CORNERS_NONE) {
+            val cornerSize = if (roundCorners == ROUNDED_CORNERS_SMALL) R.dimen.rounded_corner_radius_small else R.dimen.rounded_corner_radius_big
+            val cornerRadius = resources.getDimension(cornerSize).toInt()
+            transformations.add(RoundedCorners(cornerRadius))
+        }
+        builder = builder.transform(*transformations.toTypedArray())
+
+        builder.into(target)
+    }
+    rawImage.recycle()
 }
 
 fun Context.loadStaticGIF(
@@ -1123,35 +1168,9 @@ fun Context.getFileDateTaken(path: String): Long {
 }
 
 fun Context.getExifImageOrientation(path: String): Int {
-    val uri = if (path.startsWith("content://")) {
-        Uri.parse(path)
-    } else {
-        Uri.fromFile(File(path))
-    }
-
-    try {
-        val pfd = contentResolver.openFileDescriptor(
-            uri, "r", null
-        ) ?: return 0
-
-        val libRaw = LibRaw.newInstance()
-
-        libRaw.use {
-            val fd = pfd.detachFd()
-            val result = libRaw.openFd(fd)
-            val orientation = libRaw.orientation
-            pfd.close()
-            if (result != 0) {
-                return 0
-            }
-            return orientation
-        }
-
-    } catch (e: Exception) {
-        Log.e("ERROR", e.toString())
-        return 0
-    }
-
+    val rawImage = RawImage()
+    rawImage.open(this, path)
+    return rawImage.orientation
 }
 
 fun Context.getImageOrientationInDegrees(path: String): Int {

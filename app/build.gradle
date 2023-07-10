@@ -14,10 +14,10 @@ android {
 
     defaultConfig {
         applicationId "com.gallery.raw"
-        minSdkVersion 24
+        minSdkVersion 27
         targetSdkVersion 33
-        versionCode 389
-        versionName "6.26.7"
+        versionCode 401
+        versionName "0.1.4"
         setProperty("archivesBaseName", "gallery-$versionCode")
         vectorDrawables.useSupportLibrary = true
     }

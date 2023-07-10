@@ -144,6 +144,8 @@ public class LibRaw implements AutoCloseable {
     public native int getRightMargin();
     public native int getOrientation(); // NOT the same as EXIF orientation
 
+    public native ByteBuffer getThumbnail();
+
     /**
      * Get a bitmap for the current image
      * @return
