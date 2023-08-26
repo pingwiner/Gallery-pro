@@ -51,9 +51,11 @@ import com.simplemobiletools.gallery.pro.activities.ViewPagerActivity
 import com.simplemobiletools.gallery.pro.adapters.PortraitPhotosAdapter
 import com.simplemobiletools.gallery.pro.extensions.config
 import com.simplemobiletools.gallery.pro.extensions.getImageOrientationInDegrees
+import com.simplemobiletools.gallery.pro.extensions.loadRaw
 import com.simplemobiletools.gallery.pro.extensions.sendFakeClick
 import com.simplemobiletools.gallery.pro.helpers.*
 import com.simplemobiletools.gallery.pro.models.Medium
+import com.simplemobiletools.gallery.pro.raw.RawImage
 import com.simplemobiletools.gallery.pro.svg.SvgSoftwareLayerSetter
 import com.squareup.picasso.Callback
 import com.squareup.picasso.Picasso
@@ -63,6 +65,7 @@ import org.apache.sanselan.formats.jpeg.JpegImageParser
 import pl.droidsonroids.gif.InputSource
 import java.io.File
 import java.io.FileOutputStream
+import java.util.Locale
 import kotlin.math.ceil
 
 class PhotoFragment : ViewPagerFragment() {
@@ -439,17 +442,27 @@ class PhotoFragment : ViewPagerFragment() {
 
     private fun loadWithGlide(path: String, addZoomableView: Boolean) {
         val priority = if (mIsFragmentVisible) Priority.IMMEDIATE else Priority.NORMAL
-        val options = RequestOptions()
+
+        var options = RequestOptions()
             .signature(mMedium.getKey())
             .format(DecodeFormat.PREFER_ARGB_8888)
             .priority(priority)
             .diskCacheStrategy(DiskCacheStrategy.RESOURCE)
             .fitCenter()
-            .transform(Rotate(mCurrentRotationDegrees))
             .diskCacheStrategy(DiskCacheStrategy.NONE)
 
+        var rawData: ByteArray? = null
+        if (mMedium.type == TYPE_RAWS) {
+            val rawImage = RawImage()
+            rawImage.open(requireContext(), path, true)
+            rawData = rawImage.data
+            if (!mMedium.name.lowercase(Locale.getDefault()).endsWith(".raf")) {
+                options = options.transform(Rotate(mCurrentRotationDegrees))
+            }
+        }
+
         Glide.with(requireContext())
-            .load(path)
+            .load(rawData ?: path)
             .apply(options)
             .listener(object : RequestListener<Drawable> {
                 override fun onLoadFailed(e: GlideException?, model: Any?, target: Target<Drawable>?, isFirstResource: Boolean): Boolean {

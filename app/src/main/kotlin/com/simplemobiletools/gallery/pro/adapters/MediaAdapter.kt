@@ -109,7 +109,7 @@ class MediaAdapter(
         val allowLongPress = (!isAGetIntent || allowMultiplePicks) && tmbItem is Medium
         holder.bindView(tmbItem, tmbItem is Medium, allowLongPress) { itemView, adapterPosition ->
             if (tmbItem is Medium) {
-                setupThumbnail(itemView, tmbItem)
+                setupThumbnail(itemView, tmbItem, position)
             } else {
                 setupSection(itemView, tmbItem as ThumbnailSection)
             }
@@ -619,7 +619,7 @@ class MediaAdapter(
         }, INSTANT_LOAD_DURATION)
     }
 
-    private fun setupThumbnail(view: View, medium: Medium) {
+    private fun setupThumbnail(view: View, medium: Medium, position: Int) {
         val isSelected = selectedKeys.contains(medium.path.hashCode())
         view.apply {
             val padding = if (config.thumbnailSpacing <= 1) {
@@ -687,7 +687,7 @@ class MediaAdapter(
 
             if (loadImageInstantly) {
                 activity.loadImage(
-                    medium.type, path, medium_thumbnail, scrollHorizontally, animateGifs, cropThumbnails, roundedCorners, medium.getKey(), rotatedImagePaths
+                    medium.type, path, medium_thumbnail, scrollHorizontally, animateGifs, cropThumbnails, roundedCorners, medium.getKey(), rotatedImagePaths, medium_thumbnail.hashCode()
                 )
             } else {
                 medium_thumbnail.setImageDrawable(null)
@@ -697,7 +697,7 @@ class MediaAdapter(
                     if (isVisible) {
                         activity.loadImage(
                             medium.type, path, medium_thumbnail, scrollHorizontally, animateGifs, cropThumbnails, roundedCorners,
-                            medium.getKey(), rotatedImagePaths
+                            medium.getKey(), rotatedImagePaths, medium_thumbnail.hashCode()
                         )
                     }
                 }, IMAGE_LOAD_DELAY)

@@ -1,16 +1,14 @@
 package com.simplemobiletools.gallery.pro.raw
 
 import android.content.Context
+import android.graphics.Bitmap
 import android.net.Uri
 import android.util.Log
 import com.homesoft.photo.libraw.LibRaw
 import java.io.File
-import java.nio.ByteBuffer
 
 
 class RawImage {
-    private var libRaw: LibRaw = LibRaw.newInstance()
-
     private var _orientation: Int = 0
     val orientation: Int
         get() = _orientation
@@ -22,7 +20,7 @@ class RawImage {
     val orientationInDegrees: Int
         get() = LibRaw.toDegrees(orientation)
 
-    fun open(context: Context, path: String) {
+    fun open(context: Context, path: String, getLargestSize: Boolean) {
         val uri = if (path.startsWith("content://")) {
             Uri.parse(path)
         } else {
@@ -33,19 +31,20 @@ class RawImage {
             val pfd = context.contentResolver.openFileDescriptor(
                 uri, "r", null
             ) ?: return
+            val libRaw: LibRaw = LibRaw.newInstance()
             libRaw.use {
                 val fd = pfd.detachFd()
-                val result = it.openFd(fd)
-                _orientation = it.orientation
-                if (it.thumbnail != null) {
-                    _data = ByteArray(it.thumbnail.remaining())
-                    it.thumbnail.get(_data!!)
+                val result = it.openFd(fd, getLargestSize)
+                _orientation = it.orientation ?: 0
+                if (it.thumbnailSize > 0) {
+                    _data = ByteArray(it.thumbnailSize)
+                    it.getThumbnail(_data)
                 }
-                pfd.close()
                 if (result != 0) {
                     Log.e("ERROR", "openFd failed: $path")
                 }
             }
+            pfd.close()
         } catch (e: Exception) {
             Log.e("ERROR", e.toString())
         }
@@ -53,5 +52,7 @@ class RawImage {
 
     fun recycle() {
         _data = null
+        System.gc()
     }
+
 }

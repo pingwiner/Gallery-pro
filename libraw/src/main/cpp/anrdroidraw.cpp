@@ -10,10 +10,12 @@ extern "C" JNIEXPORT jlong JNICALL Java_com_homesoft_photo_libraw_LibRaw_init(JN
     auto libRaw = new AndroidLibRaw(flags);
     return reinterpret_cast<jlong>(libRaw);
 }
-extern "C" JNIEXPORT void JNICALL Java_com_homesoft_photo_libraw_LibRaw_recycle(JNIEnv* env, jobject jLibRaw){
+extern "C" JNIEXPORT void JNICALL Java_com_homesoft_photo_libraw_LibRaw_recycle(JNIEnv* env, jobject jLibRaw) {
     auto libRaw = getLibRaw(env, jLibRaw);
-    libRaw->recycle();
-    delete libRaw;
+    if (libRaw) {
+        libRaw->recycle();
+        delete libRaw;
+    }
 }
 extern "C" JNIEXPORT jint JNICALL Java_com_homesoft_photo_libraw_LibRaw_open(JNIEnv* env, jobject jLibRaw, jstring file){
     const char* nativeString = env->GetStringUTFChars(file, nullptr);
@@ -43,7 +45,7 @@ extern "C" JNIEXPORT jint JNICALL Java_com_homesoft_photo_libraw_LibRaw_openBuff
     }
     return result;
 }
-extern "C" JNIEXPORT jint JNICALL Java_com_homesoft_photo_libraw_LibRaw_openFd(JNIEnv* env, jobject jLibRaw, jint fd){
+extern "C" JNIEXPORT jint JNICALL Java_com_homesoft_photo_libraw_LibRaw_openFd(JNIEnv* env, jobject jLibRaw, jint fd, jboolean getLargestSize){
     LibRaw_fd_datastream stream(fd);
     if (!stream.valid()) {
         return LIBRAW_IO_ERROR;
@@ -51,17 +53,48 @@ extern "C" JNIEXPORT jint JNICALL Java_com_homesoft_photo_libraw_LibRaw_openFd(J
     auto libRaw = getLibRaw(env, jLibRaw);
     int result=libRaw->open_datastream(&stream);
     if(result==0){
-        result=libRaw->unpack_thumb();
+        int count = libRaw->imgdata.thumbs_list.thumbcount;
+        int largestThumbIndex = 0;
+        int largestSize = 0;
+        int smallestThumbIndex = 0;
+        int smallestSize = 100000000;
+        for (int i = 0; i < count; i++) {
+            if (libRaw->imgdata.thumbs_list.thumblist[i].tlength < smallestSize) {
+                smallestThumbIndex = i;
+                smallestSize = libRaw->imgdata.thumbs_list.thumblist[i].tlength;
+            }
+            if (libRaw->imgdata.thumbs_list.thumblist[i].tlength > largestSize) {
+                largestThumbIndex = i;
+                largestSize = libRaw->imgdata.thumbs_list.thumblist[i].tlength;
+            }
+        }
+        if (getLargestSize) {
+            result = libRaw->unpack_thumb_ex(largestThumbIndex);
+        } else {
+            result = libRaw->unpack_thumb_ex(smallestThumbIndex);
+        };
+
     }
     return result;
 }
-extern "C" JNIEXPORT jobject JNICALL Java_com_homesoft_photo_libraw_LibRaw_getThumbnail(JNIEnv* env, jobject jLibRaw){
+extern "C" JNIEXPORT void JNICALL Java_com_homesoft_photo_libraw_LibRaw_getThumbnail(JNIEnv* env, jobject jLibRaw, jbyteArray arr){
     auto libRaw = getLibRaw(env, jLibRaw);
     int count = libRaw->imgdata.thumbs_list.thumbcount;
-    if (count > 0) {
-        return env->NewDirectByteBuffer(libRaw->imgdata.thumbnail.thumb, libRaw->imgdata.thumbnail.tlength);
+    if (count > 0 && libRaw->imgdata.thumbnail.thumb) {
+        jbyte* bytes = env->GetByteArrayElements(arr, 0);
+        for (int i = 0; i < libRaw->imgdata.thumbnail.tlength; i++) {
+            bytes[i] = libRaw->imgdata.thumbnail.thumb[i];
+        }
+        env->ReleaseByteArrayElements(arr, bytes, 0);
     }
-    return nullptr;
+}
+extern "C" JNIEXPORT jint JNICALL Java_com_homesoft_photo_libraw_LibRaw_getThumbnailSize(JNIEnv* env, jobject jLibRaw){
+    auto libRaw = getLibRaw(env, jLibRaw);
+    int count = libRaw->imgdata.thumbs_list.thumbcount;
+    if (count > 0 && libRaw->imgdata.thumbnail.thumb) {
+        return libRaw->imgdata.thumbnail.tlength;
+    }
+    return 0;
 }
 extern "C" JNIEXPORT void JNICALL Java_com_homesoft_photo_libraw_LibRaw_clearCancelFlag(JNIEnv* env, jobject jLibRaw){
     getLibRaw(env, jLibRaw)->clearCancelFlag();

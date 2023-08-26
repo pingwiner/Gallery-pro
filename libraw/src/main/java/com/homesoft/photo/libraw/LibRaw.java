@@ -93,7 +93,7 @@ public class LibRaw implements AutoCloseable {
     }
 
     public Bitmap decodeBitmap(int fd, BitmapFactory.Options options) throws ErrnoException {
-        int result=openFd(fd);
+        int result=openFd(fd, false);
         if(result!=0) {
             throw new ErrnoException("openFd", result);
         }
@@ -129,7 +129,7 @@ public class LibRaw implements AutoCloseable {
     public native int open(String file);
     public native int openBufferPtr(long ptr, int size);
     public native int openBuffer(byte[] buffer, int size);
-    public native int openFd(int fd);
+    public native int openFd(int fd, boolean getLargestSize);
 
     public native int dcrawProcess();
     public native int dcrawProcessForced(@NonNull ByteBuffer colorCurve);
@@ -144,7 +144,8 @@ public class LibRaw implements AutoCloseable {
     public native int getRightMargin();
     public native int getOrientation(); // NOT the same as EXIF orientation
 
-    public native ByteBuffer getThumbnail();
+    public native void getThumbnail(byte[] data);
+    public native int getThumbnailSize();
 
     /**
      * Get a bitmap for the current image

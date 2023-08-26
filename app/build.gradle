@@ -16,8 +16,8 @@ android {
         applicationId "com.gallery.raw"
         minSdkVersion 27
         targetSdkVersion 33
-        versionCode 401
-        versionName "0.1.4"
+        versionCode 402
+        versionName "0.1.5"
         setProperty("archivesBaseName", "gallery-$versionCode")
         vectorDrawables.useSupportLibrary = true
     }

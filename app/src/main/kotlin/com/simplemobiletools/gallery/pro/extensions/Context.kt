@@ -8,12 +8,11 @@ import android.database.Cursor
 import android.graphics.Bitmap
 import android.graphics.drawable.PictureDrawable
 import android.media.AudioManager
-import android.net.Uri
 import android.os.Process
 import android.provider.MediaStore.Files
 import android.provider.MediaStore.Images
-import android.util.Log
 import android.widget.ImageView
+import androidx.exifinterface.media.ExifInterface
 import com.bumptech.glide.Glide
 import com.bumptech.glide.Priority
 import com.bumptech.glide.load.DataSource
@@ -22,7 +21,6 @@ import com.bumptech.glide.load.Transformation
 import com.bumptech.glide.load.engine.DiskCacheStrategy
 import com.bumptech.glide.load.engine.GlideException
 import com.bumptech.glide.load.resource.bitmap.CenterCrop
-import com.bumptech.glide.load.resource.bitmap.FitCenter
 import com.bumptech.glide.load.resource.bitmap.Rotate
 import com.bumptech.glide.load.resource.bitmap.RoundedCorners
 import com.bumptech.glide.load.resource.drawable.DrawableTransitionOptions
@@ -30,6 +28,7 @@ import com.bumptech.glide.request.RequestListener
 import com.bumptech.glide.request.RequestOptions
 import com.bumptech.glide.request.target.Target
 import com.bumptech.glide.signature.ObjectKey
+import com.homesoft.photo.libraw.LibRaw
 import com.simplemobiletools.commons.extensions.*
 import com.simplemobiletools.commons.helpers.*
 import com.simplemobiletools.commons.views.MySquareImageView
@@ -40,6 +39,7 @@ import com.simplemobiletools.gallery.pro.helpers.*
 import com.simplemobiletools.gallery.pro.helpers.Config.Companion.SORT_BY_FAVORITE
 import com.simplemobiletools.gallery.pro.interfaces.*
 import com.simplemobiletools.gallery.pro.models.*
+import com.simplemobiletools.gallery.pro.raw.RawImage
 import com.simplemobiletools.gallery.pro.svg.SvgSoftwareLayerSetter
 import com.squareup.picasso.Picasso
 import pl.droidsonroids.gif.GifDrawable
@@ -47,9 +47,10 @@ import java.io.File
 import java.io.FileInputStream
 import java.nio.ByteBuffer
 import java.nio.channels.FileChannel
+import java.util.Collections.rotate
+import java.util.Locale
 import kotlin.collections.set
-import com.homesoft.photo.libraw.LibRaw
-import com.simplemobiletools.gallery.pro.raw.RawImage
+
 
 val Context.audioManager get() = getSystemService(Context.AUDIO_SERVICE) as AudioManager
 
@@ -437,7 +438,7 @@ fun Context.getFolderNameFromPath(path: String): String {
 
 fun Context.loadImage(
     type: Int, path: String, target: MySquareImageView, horizontalScroll: Boolean, animateGifs: Boolean, cropThumbnails: Boolean,
-    roundCorners: Int, signature: ObjectKey, skipMemoryCacheAtPaths: ArrayList<String>? = null
+    roundCorners: Int, signature: ObjectKey, skipMemoryCacheAtPaths: ArrayList<String>? = null, position: Int = 0
 ) {
     target.isHorizontalScrolling = horizontalScroll
     if (type == TYPE_IMAGES || type == TYPE_VIDEOS || type == TYPE_RAWS || type == TYPE_PORTRAITS) {
@@ -560,7 +561,7 @@ fun Context.loadJpg(
         .apply(options)
         .transition(DrawableTransitionOptions.withCrossFade())
 
-    val transformations = mutableListOf<Transformation<Bitmap>>(Rotate(orientation))
+    val transformations = mutableListOf<Transformation<Bitmap>>()
     if (cropThumbnails) {
         transformations.add(CenterCrop())
     }
@@ -574,6 +575,8 @@ fun Context.loadJpg(
     builder.into(target)
 }
 
+
+
 fun Context.loadRaw(
     path: String,
     target: MySquareImageView,
@@ -583,14 +586,15 @@ fun Context.loadRaw(
     skipMemoryCacheAtPaths: ArrayList<String>? = null
 ) {
     val rawImage = RawImage()
-    rawImage.open(this, path)
-    val orientation = rawImage.orientationInDegrees
+    rawImage.open(this, path, false)
+    val orientation = if (!path.lowercase(Locale.getDefault()).endsWith(".raf")) {
+        rawImage.orientationInDegrees
+    } else 0
     var options = RequestOptions()
         .signature(signature)
-//        .skipMemoryCache(skipMemoryCacheAtPaths?.contains(path) == true)
-        .diskCacheStrategy(DiskCacheStrategy.RESOURCE)
+        //.skipMemoryCache(skipMemoryCacheAtPaths?.contains(path) == true)
+        .diskCacheStrategy(DiskCacheStrategy.NONE)
         .priority(Priority.LOW)
-        .diskCacheStrategy(DiskCacheStrategy.RESOURCE)
 
     if (cropThumbnails) options = options.centerCrop() else options = options.fitCenter()
 
@@ -1169,12 +1173,26 @@ fun Context.getFileDateTaken(path: String): Long {
 
 fun Context.getExifImageOrientation(path: String): Int {
     val rawImage = RawImage()
-    rawImage.open(this, path)
-    return rawImage.orientation
+    rawImage.open(this, path, true)
+    val orientation = rawImage.orientation
+    rawImage.recycle()
+    return orientation
 }
 
 fun Context.getImageOrientationInDegrees(path: String): Int {
     val orientation = getExifImageOrientation(path)
     return LibRaw.toDegrees(orientation)
+}
+
+fun Context.getImageOrientationLegacy(path: String): Int {
+    val exif = ExifInterface(path)
+    val orientation: Int = exif.getAttributeInt(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL)
+
+    return when (orientation) {
+        ExifInterface.ORIENTATION_ROTATE_270 -> 270
+        ExifInterface.ORIENTATION_ROTATE_180 -> 180
+        ExifInterface.ORIENTATION_ROTATE_90 -> 90
+        else -> 0
+    }
 }
 
